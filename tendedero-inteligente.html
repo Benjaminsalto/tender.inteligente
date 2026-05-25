@@ -1,0 +1,837 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tendedero Inteligente</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;600;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0f1e;
+    --surface: #111827;
+    --card: #1a2236;
+    --border: #1e2d45;
+    --accent: #38bdf8;
+    --accent2: #818cf8;
+    --rain: #60a5fa;
+    --ok: #34d399;
+    --warn: #fbbf24;
+    --danger: #f87171;
+    --text: #e2e8f0;
+    --muted: #64748b;
+    --font-mono: 'Space Mono', monospace;
+    --font-main: 'Syne', sans-serif;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font-main);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Animated background */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background: radial-gradient(ellipse at 20% 20%, rgba(56,189,248,0.06) 0%, transparent 60%),
+                radial-gradient(ellipse at 80% 80%, rgba(129,140,248,0.06) 0%, transparent 60%);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .container {
+    max-width: 420px;
+    margin: 0 auto;
+    padding: 20px 16px 40px;
+    position: relative;
+    z-index: 1;
+  }
+
+  /* Header */
+  header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 24px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .logo {
+    font-size: 18px;
+    font-weight: 800;
+    letter-spacing: -0.5px;
+    color: var(--text);
+  }
+
+  .logo span { color: var(--accent); }
+
+  .status-pill {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    padding: 4px 10px;
+    border-radius: 20px;
+    border: 1px solid;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    animation: fadeIn 0.5s ease;
+  }
+
+  .status-pill.conectado { color: var(--ok); border-color: var(--ok); background: rgba(52,211,153,0.08); }
+  .status-pill.desconectado { color: var(--muted); border-color: var(--muted); background: rgba(100,116,139,0.08); }
+
+  .dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: currentColor;
+    animation: pulse 1.5s infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.3; }
+  }
+
+  /* Main status card */
+  .main-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 24px;
+    margin-bottom: 16px;
+    position: relative;
+    overflow: hidden;
+    transition: all 0.5s ease;
+  }
+
+  .main-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, var(--accent), var(--accent2));
+    transition: background 0.5s ease;
+  }
+
+  .main-card.lluvia::before {
+    background: linear-gradient(90deg, var(--rain), #2563eb);
+  }
+
+  .weather-icon {
+    font-size: 64px;
+    text-align: center;
+    margin-bottom: 12px;
+    display: block;
+    filter: drop-shadow(0 0 20px rgba(56,189,248,0.3));
+    animation: float 3s ease-in-out infinite;
+  }
+
+  @keyframes float {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-6px); }
+  }
+
+  .estado-titulo {
+    text-align: center;
+    font-size: 26px;
+    font-weight: 800;
+    letter-spacing: -1px;
+    margin-bottom: 4px;
+  }
+
+  .estado-subtitulo {
+    text-align: center;
+    color: var(--muted);
+    font-size: 13px;
+    font-family: var(--font-mono);
+    margin-bottom: 20px;
+  }
+
+  .techo-status {
+    background: var(--surface);
+    border-radius: 12px;
+    padding: 14px 18px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border: 1px solid var(--border);
+  }
+
+  .techo-label {
+    font-size: 12px;
+    color: var(--muted);
+    font-family: var(--font-mono);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 4px;
+  }
+
+  .techo-value {
+    font-size: 18px;
+    font-weight: 700;
+  }
+
+  .techo-value.abierto { color: var(--ok); }
+  .techo-value.cerrado { color: var(--rain); }
+
+  .techo-icon {
+    font-size: 32px;
+    transition: transform 0.5s ease;
+  }
+
+  /* Sensors grid */
+  .section-title {
+    font-size: 11px;
+    font-family: var(--font-mono);
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    margin-bottom: 12px;
+  }
+
+  .sensors-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+    margin-bottom: 16px;
+  }
+
+  .sensor-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 14px 10px;
+    text-align: center;
+    transition: all 0.4s ease;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .sensor-card.activo {
+    border-color: var(--rain);
+    background: rgba(96,165,250,0.08);
+  }
+
+  .sensor-card.activo::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(circle at center, rgba(96,165,250,0.12), transparent 70%);
+    animation: ripple 1.5s ease-in-out infinite;
+  }
+
+  @keyframes ripple {
+    0%, 100% { opacity: 0.5; transform: scale(1); }
+    50% { opacity: 1; transform: scale(1.05); }
+  }
+
+  .sensor-num {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    color: var(--muted);
+    margin-bottom: 8px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+
+  .sensor-emoji {
+    font-size: 24px;
+    display: block;
+    margin-bottom: 6px;
+  }
+
+  .sensor-valor {
+    font-family: var(--font-mono);
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--text);
+  }
+
+  .sensor-card.activo .sensor-valor { color: var(--rain); }
+
+  .sensor-barra {
+    height: 3px;
+    background: var(--border);
+    border-radius: 2px;
+    margin-top: 8px;
+    overflow: hidden;
+  }
+
+  .sensor-fill {
+    height: 100%;
+    border-radius: 2px;
+    background: var(--accent);
+    transition: width 0.6s ease, background 0.4s ease;
+  }
+
+  .sensor-card.activo .sensor-fill {
+    background: var(--rain);
+  }
+
+  /* Control manual */
+  .control-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 20px;
+    margin-bottom: 16px;
+  }
+
+  .control-row {
+    display: flex;
+    gap: 10px;
+  }
+
+  .btn {
+    flex: 1;
+    padding: 13px;
+    border-radius: 12px;
+    border: 1px solid;
+    font-family: var(--font-main);
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+  }
+
+  .btn:active { transform: scale(0.96); }
+
+  .btn-abrir {
+    background: rgba(52,211,153,0.1);
+    border-color: var(--ok);
+    color: var(--ok);
+  }
+
+  .btn-abrir:hover { background: rgba(52,211,153,0.2); }
+
+  .btn-cerrar {
+    background: rgba(96,165,250,0.1);
+    border-color: var(--rain);
+    color: var(--rain);
+  }
+
+  .btn-cerrar:hover { background: rgba(96,165,250,0.2); }
+
+  .btn-auto {
+    width: 100%;
+    margin-top: 10px;
+    background: rgba(56,189,248,0.08);
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+
+  .btn-auto.activo {
+    background: rgba(56,189,248,0.2);
+    box-shadow: 0 0 20px rgba(56,189,248,0.2);
+  }
+
+  /* Alertas */
+  .alertas-lista {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    overflow: hidden;
+    margin-bottom: 16px;
+  }
+
+  .alertas-header {
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .badge {
+    background: var(--accent);
+    color: var(--bg);
+    font-family: var(--font-mono);
+    font-size: 10px;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 10px;
+  }
+
+  .alerta-item {
+    padding: 14px 20px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    animation: slideIn 0.4s ease;
+  }
+
+  .alerta-item:last-child { border-bottom: none; }
+
+  @keyframes slideIn {
+    from { opacity: 0; transform: translateY(-10px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .alerta-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    margin-top: 5px;
+    flex-shrink: 0;
+  }
+
+  .alerta-dot.lluvia { background: var(--rain); }
+  .alerta-dot.ok { background: var(--ok); }
+  .alerta-dot.manual { background: var(--warn); }
+
+  .alerta-texto {
+    font-size: 13px;
+    line-height: 1.4;
+    flex: 1;
+  }
+
+  .alerta-tiempo {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    color: var(--muted);
+    margin-top: 3px;
+  }
+
+  /* Stats row */
+  .stats-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-bottom: 16px;
+  }
+
+  .stat-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 16px;
+  }
+
+  .stat-label {
+    font-size: 10px;
+    font-family: var(--font-mono);
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 8px;
+  }
+
+  .stat-value {
+    font-size: 28px;
+    font-weight: 800;
+    color: var(--accent);
+    letter-spacing: -1px;
+  }
+
+  .stat-unit {
+    font-size: 12px;
+    color: var(--muted);
+    font-family: var(--font-mono);
+    margin-top: 2px;
+  }
+
+  /* Notification toast */
+  .toast {
+    position: fixed;
+    top: 20px;
+    left: 50%;
+    transform: translateX(-50%) translateY(-100px);
+    background: var(--card);
+    border: 1px solid var(--accent);
+    border-radius: 14px;
+    padding: 14px 20px;
+    font-size: 13px;
+    font-weight: 600;
+    z-index: 100;
+    transition: transform 0.4s cubic-bezier(0.34,1.56,0.64,1);
+    box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    max-width: 320px;
+    width: 90%;
+  }
+
+  .toast.show { transform: translateX(-50%) translateY(0); }
+  .toast.lluvia-toast { border-color: var(--rain); }
+
+  /* Rain animation */
+  .lluvia-anim {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 0;
+    opacity: 0;
+    transition: opacity 0.5s;
+  }
+
+  .lluvia-anim.visible { opacity: 1; }
+
+  .gota {
+    position: absolute;
+    width: 1px;
+    background: linear-gradient(transparent, var(--rain));
+    animation: caer linear infinite;
+    opacity: 0.3;
+  }
+
+  @keyframes caer {
+    from { transform: translateY(-20px); opacity: 0.3; }
+    to { transform: translateY(100vh); opacity: 0; }
+  }
+
+  @keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+
+  .modo-tag {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    padding: 3px 8px;
+    border-radius: 6px;
+    background: rgba(56,189,248,0.1);
+    color: var(--accent);
+    border: 1px solid rgba(56,189,248,0.2);
+  }
+</style>
+</head>
+<body>
+
+<!-- Rain animation -->
+<div class="lluvia-anim" id="lluviaAnim"></div>
+
+<!-- Toast notification -->
+<div class="toast" id="toast">
+  <span id="toastEmoji">🌧️</span>
+  <span id="toastMsg">Lluvia detectada</span>
+</div>
+
+<div class="container">
+
+  <!-- Header -->
+  <header>
+    <div class="logo">Tende<span>ro</span> IA</div>
+    <div class="status-pill conectado" id="statusPill">
+      <div class="dot"></div>
+      <span>Conectado</span>
+    </div>
+  </header>
+
+  <!-- Main status card -->
+  <div class="main-card" id="mainCard">
+    <span class="weather-icon" id="weatherIcon">☀️</span>
+    <div class="estado-titulo" id="estadoTitulo">Todo en orden</div>
+    <div class="estado-subtitulo" id="estadoSub">Sin lluvia detectada · Actualizado hace 2s</div>
+    <div class="techo-status">
+      <div>
+        <div class="techo-label">Estado del techo</div>
+        <div class="techo-value abierto" id="techoValor">ABIERTO</div>
+      </div>
+      <div class="techo-icon" id="techoIcono">🏠</div>
+    </div>
+  </div>
+
+  <!-- Sensors -->
+  <div class="section-title">Sensores · 50cm de cobertura</div>
+  <div class="sensors-grid">
+    <div class="sensor-card" id="s1">
+      <div class="sensor-num">S-01</div>
+      <span class="sensor-emoji">💧</span>
+      <div class="sensor-valor" id="v1">0%</div>
+      <div class="sensor-barra"><div class="sensor-fill" id="b1" style="width:5%"></div></div>
+    </div>
+    <div class="sensor-card" id="s2">
+      <div class="sensor-num">S-02</div>
+      <span class="sensor-emoji">💧</span>
+      <div class="sensor-valor" id="v2">0%</div>
+      <div class="sensor-barra"><div class="sensor-fill" id="b2" style="width:3%"></div></div>
+    </div>
+    <div class="sensor-card" id="s3">
+      <div class="sensor-num">S-03</div>
+      <span class="sensor-emoji">💧</span>
+      <div class="sensor-valor" id="v3">0%</div>
+      <div class="sensor-barra"><div class="sensor-fill" id="b3" style="width:8%"></div></div>
+    </div>
+  </div>
+
+  <!-- Stats -->
+  <div class="stats-row">
+    <div class="stat-card">
+      <div class="stat-label">Alertas hoy</div>
+      <div class="stat-value" id="alertasHoy">0</div>
+      <div class="stat-unit">eventos</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Tiempo cubierto</div>
+      <div class="stat-value" id="tiempoCubierto">0</div>
+      <div class="stat-unit">minutos hoy</div>
+    </div>
+  </div>
+
+  <!-- Control manual -->
+  <div class="control-card">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+      <div class="section-title" style="margin:0">Control manual</div>
+      <div class="modo-tag" id="modoTag">AUTO</div>
+    </div>
+    <div class="control-row">
+      <button class="btn btn-abrir" onclick="controlarTecho('abrir')">☀️ Abrir</button>
+      <button class="btn btn-cerrar" onclick="controlarTecho('cerrar')">🌧️ Cerrar</button>
+    </div>
+    <button class="btn btn-auto activo" id="btnAuto" onclick="toggleAuto()">⚡ Modo automático: ON</button>
+  </div>
+
+  <!-- Alertas -->
+  <div class="section-title">Historial de alertas</div>
+  <div class="alertas-lista">
+    <div class="alertas-header">
+      <span style="font-size:14px;font-weight:700">Actividad reciente</span>
+      <span class="badge" id="badgeCount">0</span>
+    </div>
+    <div id="alertasList">
+      <div style="padding:24px;text-align:center;color:var(--muted);font-size:13px;font-family:var(--font-mono)">
+        Sin alertas aún...
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+  // Estado de la app
+  let estado = {
+    llueve: false,
+    techoAbierto: true,
+    modoAuto: true,
+    sensores: [5, 3, 8],
+    alertas: [],
+    alertasHoy: 0,
+    tiempoCubierto: 0,
+    cerradoEn: null
+  };
+
+  // Crear gotas de lluvia animadas
+  function crearGotas() {
+    const cont = document.getElementById('lluviaAnim');
+    cont.innerHTML = '';
+    for (let i = 0; i < 40; i++) {
+      const g = document.createElement('div');
+      g.className = 'gota';
+      const h = Math.random() * 60 + 20;
+      g.style.cssText = `
+        left: ${Math.random()*100}%;
+        height: ${h}px;
+        animation-duration: ${Math.random()*1+0.5}s;
+        animation-delay: ${Math.random()*2}s;
+      `;
+      cont.appendChild(g);
+    }
+  }
+
+  crearGotas();
+
+  // Simular lectura de sensores
+  function simularSensores(llueve) {
+    if (llueve) {
+      return [
+        Math.random() * 40 + 60,
+        Math.random() * 40 + 55,
+        Math.random() * 40 + 50
+      ];
+    } else {
+      return [
+        Math.random() * 8 + 1,
+        Math.random() * 8 + 1,
+        Math.random() * 8 + 1
+      ];
+    }
+  }
+
+  // Actualizar UI de sensores
+  function actualizarSensores() {
+    const ids = ['s1','s2','s3'];
+    const vals = ['v1','v2','v3'];
+    const barras = ['b1','b2','b3'];
+
+    estado.sensores.forEach((v, i) => {
+      const pct = Math.round(v);
+      const activo = pct > 40;
+      document.getElementById(ids[i]).className = 'sensor-card' + (activo ? ' activo' : '');
+      document.getElementById(vals[i]).textContent = pct + '%';
+      document.getElementById(barras[i]).style.width = pct + '%';
+    });
+  }
+
+  // Agregar alerta al historial
+  function agregarAlerta(tipo, texto) {
+    const ahora = new Date();
+    const hora = ahora.toLocaleTimeString('es', {hour:'2-digit',minute:'2-digit'});
+
+    estado.alertas.unshift({ tipo, texto, hora });
+    if (estado.alertas.length > 10) estado.alertas.pop();
+
+    estado.alertasHoy++;
+    document.getElementById('alertasHoy').textContent = estado.alertasHoy;
+    document.getElementById('badgeCount').textContent = estado.alertas.length;
+
+    renderAlertas();
+    mostrarToast(tipo, texto);
+  }
+
+  function renderAlertas() {
+    const lista = document.getElementById('alertasList');
+    if (estado.alertas.length === 0) {
+      lista.innerHTML = '<div style="padding:24px;text-align:center;color:var(--muted);font-size:13px;font-family:var(--font-mono)">Sin alertas aún...</div>';
+      return;
+    }
+
+    lista.innerHTML = estado.alertas.map(a => `
+      <div class="alerta-item">
+        <div class="alerta-dot ${a.tipo}"></div>
+        <div>
+          <div class="alerta-texto">${a.texto}</div>
+          <div class="alerta-tiempo">${a.hora}</div>
+        </div>
+      </div>
+    `).join('');
+  }
+
+  // Toast notification
+  let toastTimer;
+  function mostrarToast(tipo, msg) {
+    const toast = document.getElementById('toast');
+    const emoji = tipo === 'lluvia' ? '🌧️' : tipo === 'ok' ? '☀️' : '🔧';
+    document.getElementById('toastEmoji').textContent = emoji;
+    document.getElementById('toastMsg').textContent = msg;
+    toast.className = 'toast show ' + (tipo === 'lluvia' ? 'lluvia-toast' : '');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => toast.className = 'toast', 3500);
+  }
+
+  // Actualizar estado principal
+  function actualizarEstado() {
+    const card = document.getElementById('mainCard');
+    const icon = document.getElementById('weatherIcon');
+    const titulo = document.getElementById('estadoTitulo');
+    const sub = document.getElementById('estadoSub');
+    const techoValor = document.getElementById('techoValor');
+    const techoIcono = document.getElementById('techoIcono');
+    const lluviaAnim = document.getElementById('lluviaAnim');
+
+    if (estado.llueve) {
+      card.className = 'main-card lluvia';
+      icon.textContent = '🌧️';
+      titulo.textContent = '¡Lluvia detectada!';
+      sub.textContent = 'Techo cerrado automáticamente';
+      lluviaAnim.className = 'lluvia-anim visible';
+    } else {
+      card.className = 'main-card';
+      icon.textContent = '☀️';
+      titulo.textContent = 'Todo en orden';
+      sub.textContent = 'Sin lluvia detectada · Actualizado hace 2s';
+      lluviaAnim.className = 'lluvia-anim';
+    }
+
+    if (estado.techoAbierto) {
+      techoValor.textContent = 'ABIERTO';
+      techoValor.className = 'techo-value abierto';
+      techoIcono.textContent = '🏠';
+    } else {
+      techoValor.textContent = 'CERRADO';
+      techoValor.className = 'techo-value cerrado';
+      techoIcono.textContent = '⛺';
+    }
+
+    // Tiempo cubierto
+    if (!estado.techoAbierto && estado.cerradoEn) {
+      const mins = Math.round((Date.now() - estado.cerradoEn) / 60000);
+      estado.tiempoCubierto += mins;
+      document.getElementById('tiempoCubierto').textContent = estado.tiempoCubierto;
+    }
+  }
+
+  // Control manual
+  function controlarTecho(accion) {
+    if (accion === 'abrir' && !estado.techoAbierto) {
+      estado.techoAbierto = true;
+      estado.modoAuto = false;
+      actualizarModoTag();
+      agregarAlerta('manual', 'Techo abierto manualmente');
+    } else if (accion === 'cerrar' && estado.techoAbierto) {
+      estado.techoAbierto = false;
+      estado.cerradoEn = Date.now();
+      estado.modoAuto = false;
+      actualizarModoTag();
+      agregarAlerta('manual', 'Techo cerrado manualmente');
+    }
+    actualizarEstado();
+  }
+
+  function toggleAuto() {
+    estado.modoAuto = !estado.modoAuto;
+    const btn = document.getElementById('btnAuto');
+    btn.textContent = `⚡ Modo automático: ${estado.modoAuto ? 'ON' : 'OFF'}`;
+    btn.className = 'btn btn-auto' + (estado.modoAuto ? ' activo' : '');
+    actualizarModoTag();
+    mostrarToast('manual', `Modo automático ${estado.modoAuto ? 'activado' : 'desactivado'}`);
+  }
+
+  function actualizarModoTag() {
+    document.getElementById('modoTag').textContent = estado.modoAuto ? 'AUTO' : 'MANUAL';
+  }
+
+  // Loop principal: simula datos del Arduino
+  let ciclo = 0;
+  function loop() {
+    ciclo++;
+
+    // Simular lluvia cada ~30 ciclos (60 seg)
+    const nuevaLluvia = (ciclo % 30 === 0) ? !estado.llueve : estado.llueve;
+
+    // Detectar cambio
+    if (nuevaLluvia !== estado.llueve) {
+      estado.llueve = nuevaLluvia;
+
+      if (estado.modoAuto) {
+        if (estado.llueve && estado.techoAbierto) {
+          estado.techoAbierto = false;
+          estado.cerradoEn = Date.now();
+          agregarAlerta('lluvia', '🌧️ Lluvia detectada — techo cerrado automáticamente');
+        } else if (!estado.llueve && !estado.techoAbierto) {
+          estado.techoAbierto = true;
+          agregarAlerta('ok', '☀️ Lluvia terminada — techo abierto automáticamente');
+        }
+      } else {
+        if (estado.llueve) {
+          agregarAlerta('lluvia', '⚠️ Lluvia detectada — control en modo manual');
+        }
+      }
+    }
+
+    estado.sensores = simularSensores(estado.llueve);
+    actualizarSensores();
+    actualizarEstado();
+  }
+
+  // Arrancar
+  loop();
+  setInterval(loop, 2000);
+
+  // Primera alerta de bienvenida
+  setTimeout(() => {
+    agregarAlerta('ok', '✅ Sistema iniciado — 3 sensores activos');
+  }, 1000);
+</script>
+</body>
+</html>
