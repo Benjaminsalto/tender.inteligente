@@ -1,0 +1,536 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tendedero Inteligente — Modelo 3D</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: #080c18; font-family: 'Courier New', monospace; overflow: hidden; }
+
+  #canvas { display: block; width: 100vw; height: 100vh; }
+
+  #ui {
+    position: fixed; top: 20px; left: 20px; z-index: 10;
+    color: #e2e8f0;
+  }
+
+  .title {
+    font-size: 18px; font-weight: bold; color: #38bdf8;
+    letter-spacing: 2px; text-transform: uppercase;
+    margin-bottom: 4px;
+  }
+  .subtitle { font-size: 11px; color: #64748b; letter-spacing: 1px; margin-bottom: 16px; }
+
+  .legend { display: flex; flex-direction: column; gap: 6px; }
+  .legend-item {
+    display: flex; align-items: center; gap: 8px;
+    font-size: 11px; color: #94a3b8; letter-spacing: 0.5px;
+  }
+  .dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+
+  #controls {
+    position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+    display: flex; gap: 10px; z-index: 10;
+  }
+
+  .btn {
+    background: rgba(30,42,60,0.9); border: 1px solid #1e2d45;
+    color: #94a3b8; padding: 8px 16px; border-radius: 8px;
+    font-family: 'Courier New', monospace; font-size: 11px;
+    cursor: pointer; letter-spacing: 1px; text-transform: uppercase;
+    transition: all 0.2s;
+  }
+  .btn:hover { border-color: #38bdf8; color: #38bdf8; background: rgba(56,189,248,0.08); }
+  .btn.active { border-color: #38bdf8; color: #38bdf8; background: rgba(56,189,248,0.12); }
+
+  #estado {
+    position: fixed; top: 20px; right: 20px; z-index: 10;
+    background: rgba(17,24,39,0.9); border: 1px solid #1e2d45;
+    border-radius: 12px; padding: 14px 18px; color: #e2e8f0;
+    min-width: 180px;
+  }
+  .estado-label { font-size: 10px; color: #64748b; letter-spacing: 1px; margin-bottom: 6px; }
+  .estado-valor { font-size: 16px; font-weight: bold; }
+  .estado-valor.abierto { color: #34d399; }
+  .estado-valor.cerrado { color: #60a5fa; }
+
+  #hint {
+    position: fixed; bottom: 70px; left: 50%; transform: translateX(-50%);
+    font-size: 10px; color: #334155; letter-spacing: 1px;
+    text-align: center;
+  }
+
+  #sensor-panel {
+    position: fixed; top: 20px; right: 220px; z-index: 10;
+    background: rgba(17,24,39,0.9); border: 1px solid #1e2d45;
+    border-radius: 12px; padding: 14px 18px; color: #e2e8f0;
+  }
+  .s-label { font-size: 10px; color: #64748b; letter-spacing: 1px; margin-bottom: 8px; }
+  .s-row { display: flex; align-items: center; gap: 8px; margin-bottom: 5px; }
+  .s-name { font-size: 11px; color: #94a3b8; width: 35px; }
+  .s-bar { height: 6px; border-radius: 3px; background: #1e2d45; flex: 1; overflow: hidden; }
+  .s-fill { height: 100%; border-radius: 3px; background: #34d399; transition: width 0.5s, background 0.5s; }
+  .s-val { font-size: 10px; color: #64748b; width: 30px; text-align: right; font-family: 'Courier New'; }
+</style>
+</head>
+<body>
+<canvas id="canvas"></canvas>
+
+<div id="ui">
+  <div class="title">Tendedero IA</div>
+  <div class="subtitle">MODELO 3D INTERACTIVO</div>
+  <div class="legend">
+    <div class="legend-item"><div class="dot" style="background:#8B7355"></div>Estructura aluminio</div>
+    <div class="legend-item"><div class="dot" style="background:#4A90D9"></div>Techo / lona</div>
+    <div class="legend-item"><div class="dot" style="background:#E8C547"></div>Sensores FC-37</div>
+    <div class="legend-item"><div class="dot" style="background:#FF6B35"></div>Motor / actuador</div>
+    <div class="legend-item"><div class="dot" style="background:#50C878"></div>Arduino + ESP8266</div>
+    <div class="legend-item"><div class="dot" style="background:#C0C0C0"></div>Varillas tendedero</div>
+  </div>
+</div>
+
+<div id="estado">
+  <div class="estado-label">ESTADO DEL TECHO</div>
+  <div class="estado-valor abierto" id="estadoValor">☀️ ABIERTO</div>
+</div>
+
+<div id="sensor-panel">
+  <div class="s-label">SENSORES DE LLUVIA</div>
+  <div class="s-row">
+    <div class="s-name">S-01</div>
+    <div class="s-bar"><div class="s-fill" id="sf1" style="width:5%"></div></div>
+    <div class="s-val" id="sv1">5%</div>
+  </div>
+  <div class="s-row">
+    <div class="s-name">S-02</div>
+    <div class="s-bar"><div class="s-fill" id="sf2" style="width:3%"></div></div>
+    <div class="s-val" id="sv2">3%</div>
+  </div>
+  <div class="s-row">
+    <div class="s-name">S-03</div>
+    <div class="s-bar"><div class="s-fill" id="sf3" style="width:7%"></div></div>
+    <div class="s-val" id="sv3">7%</div>
+  </div>
+</div>
+
+<div id="controls">
+  <button class="btn" onclick="toggleTecho()">⚡ Abrir / Cerrar Techo</button>
+  <button class="btn" onclick="simLluvia()">🌧️ Simular Lluvia</button>
+  <button class="btn" onclick="resetCam()">🔄 Reset Cámara</button>
+  <button class="btn" id="btnAuto" onclick="toggleAuto()">AUTO: ON</button>
+</div>
+
+<div id="hint">ARRASTRAR para rotar · SCROLL para zoom · CLICK DERECHO para mover</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+// ─── Scene setup ───────────────────────────────────────────
+const canvas = document.getElementById('canvas');
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.setClearColor(0x080c18);
+
+const scene = new THREE.Scene();
+scene.fog = new THREE.Fog(0x080c18, 30, 60);
+
+const camera = new THREE.PerspectiveCamera(45, window.innerWidth/window.innerHeight, 0.1, 100);
+camera.position.set(8, 6, 10);
+camera.lookAt(0, 1, 0);
+
+// ─── Lights ─────────────────────────────────────────────────
+const ambient = new THREE.AmbientLight(0x334466, 0.8);
+scene.add(ambient);
+
+const dirLight = new THREE.DirectionalLight(0x88bbff, 1.2);
+dirLight.position.set(8, 12, 6);
+dirLight.castShadow = true;
+dirLight.shadow.mapSize.set(2048, 2048);
+dirLight.shadow.camera.near = 0.1;
+dirLight.shadow.camera.far = 40;
+dirLight.shadow.camera.left = -10;
+dirLight.shadow.camera.right = 10;
+dirLight.shadow.camera.top = 10;
+dirLight.shadow.camera.bottom = -10;
+scene.add(dirLight);
+
+const fillLight = new THREE.PointLight(0x38bdf8, 0.6, 20);
+fillLight.position.set(-5, 4, -3);
+scene.add(fillLight);
+
+const groundLight = new THREE.PointLight(0x818cf8, 0.3, 15);
+groundLight.position.set(0, -1, 0);
+scene.add(groundLight);
+
+// ─── Grid floor ─────────────────────────────────────────────
+const grid = new THREE.GridHelper(30, 30, 0x1a2540, 0x111827);
+grid.position.y = -0.01;
+scene.add(grid);
+
+// ─── Materials ──────────────────────────────────────────────
+const matAlum  = new THREE.MeshStandardMaterial({ color: 0x8B8060, metalness: 0.7, roughness: 0.3 });
+const matLona  = new THREE.MeshStandardMaterial({ color: 0x2E5FA3, metalness: 0, roughness: 0.8, transparent: true, opacity: 0.85, side: THREE.DoubleSide });
+const matSensor= new THREE.MeshStandardMaterial({ color: 0xD4A017, metalness: 0.3, roughness: 0.5, emissive: 0x332200 });
+const matMotor = new THREE.MeshStandardMaterial({ color: 0xCC4400, metalness: 0.6, roughness: 0.4, emissive: 0x220800 });
+const matArdu  = new THREE.MeshStandardMaterial({ color: 0x1a8a3a, metalness: 0.2, roughness: 0.6, emissive: 0x001a00 });
+const matVarilla= new THREE.MeshStandardMaterial({ color: 0xaaaaaa, metalness: 0.8, roughness: 0.2 });
+const matCaja  = new THREE.MeshStandardMaterial({ color: 0x1a2540, metalness: 0.3, roughness: 0.6 });
+const matBisagra= new THREE.MeshStandardMaterial({ color: 0x666666, metalness: 0.9, roughness: 0.1 });
+
+// ─── Helper: box ────────────────────────────────────────────
+function box(w, h, d, mat, x=0, y=0, z=0, rx=0, ry=0, rz=0) {
+  const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
+  m.position.set(x, y, z);
+  m.rotation.set(rx, ry, rz);
+  m.castShadow = true;
+  m.receiveShadow = true;
+  scene.add(m);
+  return m;
+}
+
+function cyl(rt, rb, h, mat, x=0, y=0, z=0, rx=0, ry=0, rz=0, seg=8) {
+  const m = new THREE.Mesh(new THREE.CylinderGeometry(rt, rb, h, seg), mat);
+  m.position.set(x, y, z);
+  m.rotation.set(rx, ry, rz);
+  m.castShadow = true;
+  m.receiveShadow = true;
+  scene.add(m);
+  return m;
+}
+
+// ─── ESTRUCTURA: Patas (4) ───────────────────────────────────
+// Tendedero de 5m largo x 0.5m ancho x 1.5m alto aprox (escala 1:20 → 25 x 2.5 x 7.5 uu)
+// En escena: largo=6, ancho=2.5, alto=4
+const L = 6, W = 2.5, H_TEND = 4;
+
+// 4 patas verticales
+cyl(0.08, 0.08, H_TEND, matAlum, -L/2,  H_TEND/2,  W/2);
+cyl(0.08, 0.08, H_TEND, matAlum,  L/2,  H_TEND/2,  W/2);
+cyl(0.08, 0.08, H_TEND, matAlum, -L/2,  H_TEND/2, -W/2);
+cyl(0.08, 0.08, H_TEND, matAlum,  L/2,  H_TEND/2, -W/2);
+
+// Travesaños horizontales superiores (largo)
+cyl(0.06, 0.06, L, matAlum, 0, H_TEND, W/2,  0, 0, Math.PI/2);
+cyl(0.06, 0.06, L, matAlum, 0, H_TEND, -W/2, 0, 0, Math.PI/2);
+
+// Travesaños laterales superiores (ancho)
+cyl(0.06, 0.06, W, matAlum, -L/2, H_TEND, 0, Math.PI/2, 0, 0);
+cyl(0.06, 0.06, W, matAlum,  L/2, H_TEND, 0, Math.PI/2, 0, 0);
+
+// ─── VARILLAS DE TENDER ROPA ─────────────────────────────────
+const nVarillas = 5;
+for(let i = 0; i < nVarillas; i++) {
+  const z = -W/2 + (W/(nVarillas-1)) * i;
+  cyl(0.03, 0.03, L, matVarilla, 0, H_TEND - 0.1, z, 0, 0, Math.PI/2);
+}
+
+// ─── TECHO (pivotante) ───────────────────────────────────────
+const techoGroup = new THREE.Group();
+scene.add(techoGroup);
+techoGroup.position.set(-L/2, H_TEND, 0);
+
+// Panel principal de lona
+const lonaMesh = new THREE.Mesh(
+  new THREE.BoxGeometry(L, 0.04, W + 0.4),
+  matLona
+);
+lonaMesh.position.set(L/2, 0.1, 0);
+lonaMesh.castShadow = true;
+lonaMesh.receiveShadow = true;
+techoGroup.add(lonaMesh);
+
+// Marco del techo
+const frameL = new THREE.Mesh(new THREE.BoxGeometry(L, 0.08, 0.08), matAlum);
+frameL.position.set(L/2, 0.06, (W+0.4)/2);
+techoGroup.add(frameL);
+const frameL2 = frameL.clone();
+frameL2.position.z = -(W+0.4)/2;
+techoGroup.add(frameL2);
+
+const frameW = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.08, W+0.4), matAlum);
+frameW.position.set(0, 0.06, 0);
+techoGroup.add(frameW);
+const frameW2 = frameW.clone();
+frameW2.position.x = L;
+techoGroup.add(frameW2);
+
+// ─── BISAGRA (lado izquierdo fijo) ───────────────────────────
+cyl(0.12, 0.12, 0.3, matBisagra, -L/2, H_TEND, W/2,  Math.PI/2, 0, 0, 16);
+cyl(0.12, 0.12, 0.3, matBisagra, -L/2, H_TEND, -W/2, Math.PI/2, 0, 0, 16);
+
+// ─── MOTOR / ACTUADOR (lado derecho) ─────────────────────────
+const motorBase = box(0.3, 0.4, 0.3, matMotor, L/2, H_TEND + 0.2, 0);
+cyl(0.06, 0.06, 0.8, matMotor, L/2, H_TEND + 0.6, 0, Math.PI/2, 0, 0, 8);
+
+// Brazo actuador (conecta motor con techo)
+const brazo = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.8, 0.06), matMotor);
+brazo.position.set(L/2, H_TEND + 0.3, 0);
+brazo.castShadow = true;
+scene.add(brazo);
+
+// ─── CAJA ELECTRONICA (Arduino + ESP) ────────────────────────
+const cajaElec = box(0.5, 0.3, 0.7, matCaja, -L/2 + 0.3, H_TEND - 0.5, -W/2 - 0.15);
+// LED verde (encendido)
+const ledGeo = new THREE.SphereGeometry(0.04, 8, 8);
+const ledMat = new THREE.MeshStandardMaterial({ color: 0x00ff44, emissive: 0x00ff44, emissiveIntensity: 2 });
+const led = new THREE.Mesh(ledGeo, ledMat);
+led.position.set(-L/2 + 0.5, H_TEND - 0.33, -W/2 - 0.05);
+scene.add(led);
+
+// Antena ESP8266
+cyl(0.02, 0.02, 0.4, matArdu, -L/2 + 0.55, H_TEND - 0.2, -W/2 - 0.1, 0, 0, 0);
+
+// ─── SENSORES FC-37 (3 sensores en el techo) ─────────────────
+const sensorPositions = [-L/2 + 0.5, 0, L/2 - 0.5];
+const sensorMeshes = [];
+sensorPositions.forEach((sx, i) => {
+  const sg = new THREE.Group();
+  // Placa sensor
+  const placa = new THREE.Mesh(new THREE.BoxGeometry(0.25, 0.04, 0.4), matSensor);
+  placa.position.set(sx, H_TEND + 0.15, 0);
+  placa.castShadow = true;
+  sg.add(placa);
+  // Pistas de cobre (líneas)
+  for(let p = 0; p < 4; p++) {
+    const pista = new THREE.Mesh(
+      new THREE.BoxGeometry(0.02, 0.05, 0.35),
+      new THREE.MeshStandardMaterial({ color: 0xB8860B, metalness: 0.9, roughness: 0.1 })
+    );
+    pista.position.set(sx - 0.09 + p * 0.06, H_TEND + 0.17, 0);
+    sg.add(pista);
+  }
+  // Etiqueta LED del sensor
+  const sled = new THREE.Mesh(
+    new THREE.SphereGeometry(0.03, 8, 8),
+    new THREE.MeshStandardMaterial({ color: 0xff2200, emissive: 0xff0000, emissiveIntensity: 0.5 })
+  );
+  sled.position.set(sx + 0.08, H_TEND + 0.18, -0.15);
+  sg.add(sled);
+  scene.add(sg);
+  sensorMeshes.push({ group: sg, led: sled, placa });
+});
+
+// Cables de sensores a caja
+sensorPositions.forEach(sx => {
+  const points = [
+    new THREE.Vector3(sx, H_TEND + 0.13, 0),
+    new THREE.Vector3(sx, H_TEND - 0.1, -W/2),
+    new THREE.Vector3(-L/2 + 0.3, H_TEND - 0.4, -W/2 - 0.1),
+  ];
+  const curve = new THREE.CatmullRomCurve3(points);
+  const cableGeo = new THREE.TubeGeometry(curve, 20, 0.015, 6, false);
+  const cableMat = new THREE.MeshStandardMaterial({ color: 0x222222 });
+  scene.add(new THREE.Mesh(cableGeo, cableMat));
+});
+
+// ─── ROPA COLGADA (representativa) ───────────────────────────
+const ropaMat = new THREE.MeshStandardMaterial({ color: 0xffeedd, roughness: 1, side: THREE.DoubleSide });
+const ropaMat2 = new THREE.MeshStandardMaterial({ color: 0x88aacc, roughness: 1, side: THREE.DoubleSide });
+const ropas = [
+  { x: -2, z: 0,    mat: ropaMat,  w: 0.6, h: 0.9 },
+  { x: 0,  z: W/4,  mat: ropaMat2, w: 0.5, h: 1.0 },
+  { x: 1.5,z: 0,    mat: ropaMat,  w: 0.7, h: 0.85 },
+  { x: -0.8,z:-W/4, mat: ropaMat2, w: 0.55, h: 0.95 },
+];
+ropas.forEach(r => {
+  const ropa = new THREE.Mesh(new THREE.PlaneGeometry(r.w, r.h), r.mat);
+  ropa.position.set(r.x, H_TEND - r.h/2 - 0.15, r.z);
+  ropa.castShadow = true;
+  scene.add(ropa);
+  // Pinzas
+  const pinzaMat = new THREE.MeshStandardMaterial({ color: 0xff4444 });
+  [-r.w/2 + 0.05, r.w/2 - 0.05].forEach(px => {
+    const pinza = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.1, 0.04), pinzaMat);
+    pinza.position.set(r.x + px, H_TEND - 0.1, r.z);
+    scene.add(pinza);
+  });
+});
+
+// ─── GOTAS DE LLUVIA ─────────────────────────────────────────
+const gotasMat = new THREE.MeshStandardMaterial({
+  color: 0x60a5fa, transparent: true, opacity: 0.7, emissive: 0x1a3a6a
+});
+const gotas = [];
+for(let i = 0; i < 80; i++) {
+  const g = new THREE.Mesh(new THREE.CylinderGeometry(0.01, 0.01, 0.15, 4), gotasMat);
+  g.position.set(
+    (Math.random() - 0.5) * 14,
+    Math.random() * 10 + 5,
+    (Math.random() - 0.5) * 8
+  );
+  g.visible = false;
+  scene.add(g);
+  gotas.push({ mesh: g, speed: 0.08 + Math.random() * 0.06, vy: Math.random() * 10 });
+}
+
+// ─── ORBIT CONTROLS (manual) ─────────────────────────────────
+let isDragging = false, isRightDrag = false;
+let prevMouse = { x: 0, y: 0 };
+let spherical = { theta: Math.PI/4, phi: Math.PI/3.5, r: 14 };
+let panOffset = { x: 0, y: 1 };
+
+canvas.addEventListener('mousedown', e => {
+  isDragging = true;
+  isRightDrag = e.button === 2;
+  prevMouse = { x: e.clientX, y: e.clientY };
+});
+canvas.addEventListener('contextmenu', e => e.preventDefault());
+window.addEventListener('mouseup', () => isDragging = false);
+window.addEventListener('mousemove', e => {
+  if (!isDragging) return;
+  const dx = e.clientX - prevMouse.x, dy = e.clientY - prevMouse.y;
+  if (isRightDrag) {
+    panOffset.x -= dx * 0.01;
+    panOffset.y -= dy * 0.01;
+  } else {
+    spherical.theta -= dx * 0.005;
+    spherical.phi = Math.max(0.15, Math.min(Math.PI/2, spherical.phi + dy * 0.005));
+  }
+  prevMouse = { x: e.clientX, y: e.clientY };
+});
+canvas.addEventListener('wheel', e => {
+  spherical.r = Math.max(5, Math.min(25, spherical.r + e.deltaY * 0.02));
+});
+
+// Touch support
+let lastTouch = null;
+canvas.addEventListener('touchstart', e => {
+  lastTouch = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+});
+canvas.addEventListener('touchmove', e => {
+  if (!lastTouch) return;
+  const dx = e.touches[0].clientX - lastTouch.x;
+  const dy = e.touches[0].clientY - lastTouch.y;
+  spherical.theta -= dx * 0.005;
+  spherical.phi = Math.max(0.15, Math.min(Math.PI/2, spherical.phi + dy * 0.005));
+  lastTouch = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+});
+
+// ─── Estado del techo ────────────────────────────────────────
+let techoAbierto = true;
+let techoAngulo = 0;
+let targetAngulo = 0;
+let llueve = false;
+let modoAuto = true;
+let ciclo = 0;
+
+function toggleTecho() {
+  techoAbierto = !techoAbierto;
+  targetAngulo = techoAbierto ? 0 : -Math.PI / 2.2;
+  updateEstado();
+}
+
+function updateEstado() {
+  const el = document.getElementById('estadoValor');
+  if (techoAbierto) {
+    el.textContent = '☀️ ABIERTO';
+    el.className = 'estado-valor abierto';
+  } else {
+    el.textContent = '🌧️ CERRADO';
+    el.className = 'estado-valor cerrado';
+  }
+}
+
+function simLluvia() {
+  llueve = !llueve;
+  gotas.forEach(g => g.mesh.visible = llueve);
+  if (modoAuto && llueve && techoAbierto) {
+    techoAbierto = false;
+    targetAngulo = -Math.PI / 2.2;
+    updateEstado();
+  } else if (modoAuto && !llueve && !techoAbierto) {
+    techoAbierto = true;
+    targetAngulo = 0;
+    updateEstado();
+  }
+}
+
+function resetCam() {
+  spherical = { theta: Math.PI/4, phi: Math.PI/3.5, r: 14 };
+  panOffset = { x: 0, y: 1 };
+}
+
+function toggleAuto() {
+  modoAuto = !modoAuto;
+  document.getElementById('btnAuto').textContent = `AUTO: ${modoAuto ? 'ON' : 'OFF'}`;
+  document.getElementById('btnAuto').className = 'btn' + (modoAuto ? ' active' : '');
+}
+
+// ─── Sensor simulation ────────────────────────────────────────
+function updateSensors() {
+  const ids = ['sf1','sf2','sf3'];
+  const vids = ['sv1','sv2','sv3'];
+  ids.forEach((id, i) => {
+    const pct = llueve ? Math.round(60 + Math.random() * 35) : Math.round(2 + Math.random() * 8);
+    document.getElementById(id).style.width = pct + '%';
+    document.getElementById(id).style.background = pct > 50 ? '#60a5fa' : '#34d399';
+    document.getElementById(vids[i]).textContent = pct + '%';
+    // Update sensor LED color
+    if (sensorMeshes[i]) {
+      sensorMeshes[i].led.material.emissive.setHex(pct > 50 ? 0x0044ff : 0xff0000);
+      sensorMeshes[i].led.material.color.setHex(pct > 50 ? 0x4499ff : 0xff2200);
+    }
+  });
+}
+
+// ─── Animation loop ──────────────────────────────────────────
+const clock = new THREE.Clock();
+
+function animate() {
+  requestAnimationFrame(animate);
+  const t = clock.getElapsedTime();
+  ciclo++;
+
+  // Camera orbit
+  const cx = spherical.r * Math.sin(spherical.phi) * Math.sin(spherical.theta) + panOffset.x;
+  const cy = spherical.r * Math.cos(spherical.phi) + panOffset.y;
+  const cz = spherical.r * Math.sin(spherical.phi) * Math.cos(spherical.theta);
+  camera.position.set(cx, cy, cz);
+  camera.lookAt(panOffset.x, panOffset.y, 0);
+
+  // Techo animation
+  techoAngulo += (targetAngulo - techoAngulo) * 0.05;
+  techoGroup.rotation.z = techoAngulo;
+
+  // Brazo actuador sigue el techo
+  brazo.rotation.z = techoAngulo * 0.5;
+
+  // Rain drops
+  if (llueve) {
+    gotas.forEach(g => {
+      g.mesh.position.y -= g.speed;
+      if (g.mesh.position.y < -1) {
+        g.mesh.position.y = 10 + Math.random() * 5;
+        g.mesh.position.x = (Math.random() - 0.5) * 14;
+        g.mesh.position.z = (Math.random() - 0.5) * 8;
+      }
+    });
+  }
+
+  // LED pulsing
+  led.material.emissiveIntensity = 1.5 + Math.sin(t * 3) * 0.5;
+
+  // Sensor simulation update
+  if (ciclo % 60 === 0) updateSensors();
+
+  // Fill light color oscillation
+  fillLight.color.setHSL(0.58 + Math.sin(t * 0.3) * 0.05, 0.8, 0.5);
+
+  renderer.render(scene, camera);
+}
+
+animate();
+updateSensors();
+
+// Resize
+window.addEventListener('resize', () => {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+});
+</script>
+</body>
+</html>
